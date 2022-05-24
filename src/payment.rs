@@ -1,17 +1,17 @@
 use crate::*;
 
-#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
 #[serde(crate="near_sdk::serde")]
 pub struct Payment {
     pub payment_id: u128,
     pub shop: AccountId,
     pub user: AccountId,
-    pub data: String,
+    pub msg: String,
     pub fee: Balance,
     pub status: Status
 }
 
-#[derive(Serialize, Deserialize, BorshDeserialize, BorshSerialize, PartialEq, Clone, Copy)]
+#[derive(BorshDeserialize, BorshSerialize, PartialEq, Serialize, Deserialize, Clone)]
 #[serde(crate="near_sdk::serde")]
 pub enum Status {
     REQUESTING, 
@@ -45,7 +45,7 @@ pub struct PaymentJson {
     pub payment_id: U128,
     pub shop: AccountId,
     pub user: AccountId,
-    pub data: String,
+    pub msg: String,
     pub fee: U128,
     pub status: Status
 }
@@ -56,7 +56,7 @@ impl PaymentJson {
             payment_id: U128(payment_id),
             shop: payment.shop,
             user: payment.user,
-            data: payment.data,
+            msg: payment.msg,
             fee: U128(payment.fee),
             status: payment.status
         }

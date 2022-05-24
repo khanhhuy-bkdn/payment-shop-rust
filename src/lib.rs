@@ -1,14 +1,17 @@
 use near_sdk::json_types::U128;
-use near_sdk::{env, AccountId, Balance, near_bindgen, PanicOnDefault, BorshStorageKey, Promise, PromiseOrValue};
+use near_sdk::{env, AccountId, Balance, near_bindgen, PanicOnDefault, BorshStorageKey, Promise};
 use near_sdk::collections::LookupMap;
 use near_sdk::borsh::{self, BorshSerialize, BorshDeserialize};
 use near_sdk::serde::{Deserialize, Serialize};
 
 use crate::util::*;
 use crate::payment::*;
+use crate::enumeration::*;
+pub use crate::payment::PaymentJson;
 
 mod util;
 mod payment;
+mod enumeration;
 
 const DECIMALS: u32 = 100000;
 
@@ -23,6 +26,8 @@ pub struct PaymentShop {
     pub owner_id: AccountId,
     pub pay_id: u128,
     pub payment_fee: u128,
+    pub total_payment: u128,
+    pub total_payment_withdraw: u128,
     pub payments: LookupMap<u128, UpgradePayment>
 }
 
@@ -34,12 +39,14 @@ impl PaymentShop {
             owner_id,
             pay_id: 0,
             payment_fee: payment_fee.0,
+            total_payment: 0,
+            total_payment_withdraw: 0,
             payments: LookupMap::new(StorageKey::PayIdKey)
         }
     }
 
     #[payable]
-    pub fn req_payment(&mut self, user_id: AccountId, data: String, fee: Balance) {
+    pub fn req_payment(&mut self, user_id: AccountId, msg: String, fee: Balance) {
         assert_at_least_one_yocto();
         let shop_id = env::predecessor_account_id();
         self.pay_id += 1;
@@ -49,17 +56,16 @@ impl PaymentShop {
             payment_id: self.pay_id,
             shop: shop_id,
             user: user_id,
-            data: data,
+            msg: msg,
             fee: fee,
             status: Status::REQUESTING
         }; 
-
+        let log_message = format!("Request payment: payment_id: {}, account: {}, fee: {}, data: {}", self.pay_id, payment.user, payment.fee, payment.msg);
         self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
 
         let storage_use_after = env::storage_usage();
         refund_deposit(storage_use_after - storage_use_before);
 
-        let log_message = format!("Request payment: payment_id: {}, account: {}, fee: {}, data: {}", self.pay_id, payment.user, fee, payment.data);
         env::log(log_message.as_bytes());
     }
 
@@ -73,7 +79,7 @@ impl PaymentShop {
         let mut payment = Payment::from(upgrade_payment.unwrap());
         assert!(payment.status == Status::REQUESTING, "Invalid status");
         assert!(fee >= payment.fee, "Required FEE deposit of at least {} yoctoNEAR", payment.fee);
-        assert_eq!(account_id, payment.user, "Deny access");
+        assert_eq!(account_id, payment.user, "Access deny");
 
         payment.status = Status::PAID;
         self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
@@ -92,7 +98,7 @@ impl PaymentShop {
         let mut payment = Payment::from(upgrade_payment.unwrap());
         assert!(payment.status == Status::PAID, "Invalid status");
 
-        assert_eq!(account_id, payment.user, "Deny access");
+        assert!(account_id == payment.user || account_id == self.owner_id, "Access deny");
 
         payment.status = Status::CONFIRMED;
         self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
@@ -111,17 +117,18 @@ impl PaymentShop {
         let mut payment = Payment::from(upgrade_payment.unwrap());
         assert!(payment.status == Status::CONFIRMED, "Invalid status");
 
-        assert_eq!(account_id, payment.shop, "Deny access");
+        assert_eq!(account_id, payment.shop, "Access deny");
 
 
         let payment_fee_amount = payment.fee * self.payment_fee / DECIMALS as u128;
         let payment_recever = payment.fee - payment_fee_amount;
 
-        Promise::new(payment.shop).transfer(payment_recever);
-
         payment.status = Status::CLAIMED;
-        
+        self.total_payment += payment_fee_amount;
+        let shop_id = payment.shop.clone();
         self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
+
+        Promise::new(shop_id).transfer(payment_recever);
 
         let log_message = format!("Shop claim: payment_id: {}, amount {}", self.pay_id, payment_recever);
         env::log(log_message.as_bytes());
@@ -132,5 +139,14 @@ impl PaymentShop {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
         assert_eq!(account_id, self.owner_id, "Not admin or owner");
+        assert!(self.total_payment > 0, "No amount to withdraw");
+        let payment_withdraw = self.total_payment - self.total_payment_withdraw;
+        self.total_payment_withdraw = self.total_payment;
+        Promise::new(account_id).transfer(payment_withdraw);
+
+        self.total_payment_withdraw = payment_withdraw.clone();
+
+        let log_message = format!("Withdraw: amount {}", payment_withdraw);
+        env::log(log_message.as_bytes());
     }
 }

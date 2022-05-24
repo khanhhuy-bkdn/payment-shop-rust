@@ -1,17 +1,17 @@
 use near_sdk::{serde_json::json, json_types::U128};
 use near_sdk_sim::{init_simulator, UserAccount, DEFAULT_GAS, STORAGE_AMOUNT, to_yocto};
-use payment_shop_contract_tutorial::AccountJson;
+use payment_shop_rust::{PaymentJson, PaymentShopJson, Status};
 use near_sdk_sim::transaction::{ExecutionStatus};
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes!{
-    PAYMENT_SHOP_CONTRACT_WASM_FILE => "out/payment-shop.wasm",
+    PAYMENT_SHOP_CONTRACT_WASM_FILE => "out/payment-shop-contract.wasm",
 }
 
 const PAYMENT_SHOP_CONTRACT_ID: &str = "payment_shop_contract";
 const STAKING_FT_AMOUNT: &str = "50000000000000000000000000000";
 const ALICE_DEPOSIT_AMOUNT: &str = "10000000000000000000000000000";
 const FEE_CONTRACT_PERCENT: &str = "20000"; // 20%
-const BOD_FEE_AMOUNT: &str = "100000000000000000000000000"; // 10 NEAR
+const BOD_FEE_AMOUNT: u128 = 10000000000000000000000000; // 10 NEAR
 
 pub fn init() -> (UserAccount, UserAccount, UserAccount, UserAccount) {
     let root = init_simulator(None);
@@ -44,7 +44,7 @@ pub fn test_req_payment() {
         &json!({
             "user_id": bod.account_id(),
             "msg": "Hello",
-            "fee": BOD_FEE_AMOUNT
+            "fee": U128(BOD_FEE_AMOUNT)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
         to_yocto("0.01") 
@@ -54,16 +54,16 @@ pub fn test_req_payment() {
         payment_shop_contract.account_id(), 
         "get_payment_info", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes()
     ).unwrap_json();
 
-    assert_eq!(payment_json.payment_id, "1");
+    assert_eq!(payment_json.payment_id, U128(1));
     assert_eq!(payment_json.shop, alice.account_id());
-    assert_eq!(payment_json.user, alice.account_id());
+    assert_eq!(payment_json.user, bod.account_id());
     assert_eq!(payment_json.msg, "Hello");
-    assert_eq!(payment_json.fee, U128(100000000000000000000000000));
-    assert_eq!(payment_json.status, "REQUESTING");
+    assert_eq!(payment_json.fee, U128(10000000000000000000000000));
+    assert_eq!(payment_json.status, Status::REQUESTING);
 }
 
 #[test]
@@ -76,7 +76,7 @@ pub fn test_pay() {
         &json!({
             "user_id": bod.account_id(),
             "msg": "Hello",
-            "fee": BOD_FEE_AMOUNT
+            "fee": U128(BOD_FEE_AMOUNT)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
         to_yocto("0.01") 
@@ -86,7 +86,7 @@ pub fn test_pay() {
         payment_shop_contract.account_id(), 
         "pay", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
         BOD_FEE_AMOUNT 
@@ -96,16 +96,16 @@ pub fn test_pay() {
         payment_shop_contract.account_id(), 
         "get_payment_info", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes()
     ).unwrap_json();
 
-    assert_eq!(payment_json.payment_id, "1");
+    assert_eq!(payment_json.payment_id, U128(1));
     assert_eq!(payment_json.shop, alice.account_id());
-    assert_eq!(payment_json.user, alice.account_id());
+    assert_eq!(payment_json.user, bod.account_id());
     assert_eq!(payment_json.msg, "Hello");
-    assert_eq!(payment_json.fee, U128(100000000000000000000000000));
-    assert_eq!(payment_json.status, "PAID");
+    assert_eq!(payment_json.fee, U128(10000000000000000000000000));
+    assert_eq!(payment_json.status, Status::PAID);
 }
 
 #[test]
@@ -118,46 +118,86 @@ pub fn test_confirm() {
         &json!({
             "user_id": bod.account_id(),
             "msg": "Hello",
-            "fee": BOD_FEE_AMOUNT
+            "fee": U128(BOD_FEE_AMOUNT)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
         to_yocto("0.01") 
     );
 
+    let mut outcome = alice.call(
+        payment_shop_contract.account_id(), 
+        "pay", 
+        &json!({
+            "pay_id": U128(1)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        to_yocto("0.01")
+    );
+
+    assert_eq!(outcome.promise_errors().len(), 1);
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("Required FEE deposit of at least 10000000000000000000000000 yoctoNEAR"));
+    } else {
+        unreachable!()
+    }
+
+    outcome = alice.call(
+        payment_shop_contract.account_id(), 
+        "pay", 
+        &json!({
+            "pay_id": U128(1)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        BOD_FEE_AMOUNT
+    );
+
+    assert_eq!(outcome.promise_errors().len(), 1);
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("Access deny"));
+    } else {
+        unreachable!()
+    }
+
     bod.call(
         payment_shop_contract.account_id(), 
         "pay", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
-        to_yocto("0.01")
+        BOD_FEE_AMOUNT
     );
 
     bod.call(
         payment_shop_contract.account_id(), 
         "confirm", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
-        BOD_FEE_AMOUNT 
+        1 
     );
 
     let payment_json: PaymentJson = root.view(
         payment_shop_contract.account_id(), 
         "get_payment_info", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes()
     ).unwrap_json();
 
-    assert_eq!(payment_json.payment_id, "1");
+    assert_eq!(payment_json.payment_id, U128(1));
     assert_eq!(payment_json.shop, alice.account_id());
-    assert_eq!(payment_json.user, alice.account_id());
+    assert_eq!(payment_json.user, bod.account_id());
     assert_eq!(payment_json.msg, "Hello");
-    assert_eq!(payment_json.fee, U128(100000000000000000000000000));
-    assert_eq!(payment_json.status, "CONFIRMED");
+    assert_eq!(payment_json.fee, U128(10000000000000000000000000));
+    assert_eq!(payment_json.status, Status::CONFIRMED);
 }
 
 #[test]
@@ -170,7 +210,7 @@ pub fn test_claim() {
         &json!({
             "user_id": bod.account_id(),
             "msg": "Hello",
-            "fee": BOD_FEE_AMOUNT
+            "fee": U128(BOD_FEE_AMOUNT)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
         to_yocto("0.01") 
@@ -180,46 +220,86 @@ pub fn test_claim() {
         payment_shop_contract.account_id(), 
         "pay", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
-        to_yocto("0.01")
+        BOD_FEE_AMOUNT
     );
 
     bod.call(
         payment_shop_contract.account_id(), 
         "confirm", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
-        BOD_FEE_AMOUNT 
+        1 
     );
+
+    let mut outcome = bod.call(
+        payment_shop_contract.account_id(), 
+        "claim", 
+        &json!({
+            "pay_id": U128(1)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        1
+    );
+
+    assert_eq!(outcome.promise_errors().len(), 1);
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("Access deny"));
+    } else {
+        unreachable!()
+    }
+
+    outcome = alice.call(
+        payment_shop_contract.account_id(), 
+        "claim", 
+        &json!({
+            "pay_id": U128(2)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        1
+    );
+
+    assert_eq!(outcome.promise_errors().len(), 1);
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("ERR_PAYMENT_NOT_FOUND"));
+    } else {
+        unreachable!()
+    }
 
     alice.call(
         payment_shop_contract.account_id(), 
         "claim", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes(), 
         DEFAULT_GAS,
-        to_yocto("0.01") 
+        1
     );
 
     let payment_json: PaymentJson = root.view(
         payment_shop_contract.account_id(), 
         "get_payment_info", 
         &json!({
-            "pay_id": "1"
+            "pay_id": U128(1)
         }).to_string().as_bytes()
     ).unwrap_json();
 
-    assert_eq!(payment_json.payment_id, "1");
+    assert_eq!(payment_json.payment_id, U128(1));
     assert_eq!(payment_json.shop, alice.account_id());
-    assert_eq!(payment_json.user, alice.account_id());
+    assert_eq!(payment_json.user, bod.account_id());
     assert_eq!(payment_json.msg, "Hello");
-    assert_eq!(payment_json.fee, U128(100000000000000000000000000));
-    assert_eq!(payment_json.status, "CLAIMED");
+    assert_eq!(payment_json.fee, U128(10000000000000000000000000));
+    assert_eq!(payment_json.status, Status::CLAIMED);
 
     let payment_shop_json: PaymentShopJson = root.view(
         payment_shop_contract.account_id(), 
@@ -227,8 +307,8 @@ pub fn test_claim() {
         &json!({}).to_string().as_bytes()
     ).unwrap_json();
 
-    assert_eq!(payment_shop_json.pay_id, "1");
+    assert_eq!(payment_shop_json.pay_id, U128(1));
     assert_eq!(payment_shop_json.payment_fee, U128(20000));
-    assert_eq!(payment_json.total_payment, U128(100000000000000000000000000 * 20000 / 100000));
+    assert_eq!(payment_shop_json.total_payment, U128(10000000000000000000000000 * 20000 / 100000));
 
 }

@@ -1,6 +1,6 @@
 use crate::*;
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate="near_sdk::serde")]
 pub struct Payment {
     pub payment_id: u128,
@@ -11,7 +11,7 @@ pub struct Payment {
     pub status: Status
 }
 
-#[derive(BorshDeserialize, BorshSerialize, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(BorshDeserialize, BorshSerialize, PartialEq, Serialize, Deserialize, Clone, Debug)]
 #[serde(crate="near_sdk::serde")]
 pub enum Status {
     REQUESTING, 
@@ -20,7 +20,7 @@ pub enum Status {
     CLAIMED
 }
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Debug)]
 pub enum UpgradePayment {
     Current(Payment)
 }

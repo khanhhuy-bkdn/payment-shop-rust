@@ -11,6 +11,7 @@ pub struct PaymentShopJson {
 #[near_bindgen]
 impl PaymentShop {
     pub fn get_payment_info(&self, pay_id: U128) -> PaymentJson {
+        println!("pay_id {}", &pay_id.0);
         let upgradable_payment = self.payments.get(&pay_id.0).unwrap();
 
         let payment = Payment::from(upgradable_payment);

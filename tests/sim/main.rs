@@ -8,8 +8,6 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes!{
 }
 
 const PAYMENT_SHOP_CONTRACT_ID: &str = "payment_shop_contract";
-const STAKING_FT_AMOUNT: &str = "50000000000000000000000000000";
-const ALICE_DEPOSIT_AMOUNT: &str = "10000000000000000000000000000";
 const FEE_CONTRACT_PERCENT: &str = "20000"; // 20%
 const BOD_FEE_AMOUNT: u128 = 10000000000000000000000000; // 10 NEAR
 
@@ -25,7 +23,7 @@ pub fn init() -> (UserAccount, UserAccount, UserAccount, UserAccount) {
         "new", 
         &json!({
             "owner_id": alice.account_id(),
-            "payment_fee": FEE_CONTRACT_PERCENT
+            "payment_fee_percent": FEE_CONTRACT_PERCENT
         }).to_string().as_bytes(), 
         STORAGE_AMOUNT,
         DEFAULT_GAS
@@ -308,7 +306,72 @@ pub fn test_claim() {
     ).unwrap_json();
 
     assert_eq!(payment_shop_json.pay_id, U128(1));
-    assert_eq!(payment_shop_json.payment_fee, U128(20000));
+    assert_eq!(payment_shop_json.payment_fee_percent, U128(20000));
     assert_eq!(payment_shop_json.total_payment, U128(10000000000000000000000000 * 20000 / 100000));
+
+}
+
+#[test]
+pub fn test_set_payment_fee() {
+    let (root, alice, bod, payment_shop_contract) = init();
+
+    let mut outcome = bod.call(
+        payment_shop_contract.account_id(), 
+        "set_payment_fee", 
+        &json!({
+            "payment_fee_percent": U128(30000)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        1
+    );
+
+    assert_eq!(outcome.promise_errors().len(), 1);
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("Not admin or owner"));
+    } else {
+        unreachable!()
+    }
+
+    outcome = alice.call(
+        payment_shop_contract.account_id(), 
+        "set_payment_fee", 
+        &json!({
+            "payment_fee_percent": U128(0)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        1
+    );
+
+    assert_eq!(outcome.promise_errors().len(), 1);
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("Invalid payment fee"));
+    } else {
+        unreachable!()
+    }
+
+    alice.call(
+        payment_shop_contract.account_id(), 
+        "set_payment_fee", 
+        &json!({
+            "payment_fee_percent": U128(30000)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        1
+    );
+
+    let payment_shop_json: PaymentShopJson = root.view(
+        payment_shop_contract.account_id(), 
+        "get_payment_shop_info", 
+        &json!({}).to_string().as_bytes()
+    ).unwrap_json();
+
+    assert_eq!(payment_shop_json.pay_id, U128(0));
+    assert_eq!(payment_shop_json.payment_fee_percent, U128(30000));
 
 }

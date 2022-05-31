@@ -4,7 +4,7 @@ use crate::*;
 #[serde(crate = "near_sdk::serde")]
 pub struct PaymentShopJson {
     pub pay_id: U128,
-    pub payment_fee: U128,
+    pub payment_fee_percent: U128,
     pub total_payment: U128
 }
 
@@ -22,7 +22,7 @@ impl PaymentShop {
 
         PaymentShopJson {
             pay_id: U128(self.pay_id),
-            payment_fee: U128(self.payment_fee),
+            payment_fee_percent: U128(self.payment_fee_percent),
             total_payment: U128(self.total_payment)
         }
     }

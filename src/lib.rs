@@ -26,7 +26,7 @@ pub enum StorageKey {
 pub struct PaymentShop {
     pub owner_id: AccountId,
     pub pay_id: u128,
-    pub payment_fee: u128,
+    pub payment_fee_percent: u128,
     pub total_payment: u128,
     pub total_payment_withdraw: u128,
     pub payments: LookupMap<u128, UpgradePayment>
@@ -35,11 +35,11 @@ pub struct PaymentShop {
 #[near_bindgen]
 impl PaymentShop {
     #[init]
-    pub fn new(owner_id: AccountId, payment_fee: U128) -> Self {
+    pub fn new(owner_id: AccountId, payment_fee_percent: U128) -> Self {
         PaymentShop {
             owner_id,
             pay_id: 0,
-            payment_fee: payment_fee.0,
+            payment_fee_percent: payment_fee_percent.0,
             total_payment: 0,
             total_payment_withdraw: 0,
             payments: LookupMap::new(StorageKey::PayIdKey)
@@ -50,23 +50,24 @@ impl PaymentShop {
     pub fn req_payment(&mut self, user_id: AccountId, msg: String, fee: U128) {
         assert_at_least_one_yocto();
         let shop_id = env::predecessor_account_id();
-        self.pay_id += 1;
+        let pay_id = self.pay_id + 1;
+     
 
         let storage_use_before = env::storage_usage();
         let payment = Payment {
-            payment_id: self.pay_id,
+            payment_id: pay_id,
             shop: shop_id,
             user: user_id,
             msg: msg,
             fee: fee.0,
             status: Status::REQUESTING
         }; 
-        let log_message = format!("Request payment: payment_id: {}, account: {}, fee: {}, data: {}", self.pay_id, payment.user, payment.fee, payment.msg);
-        self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
+        let log_message = format!("Request payment: payment_id: {}, account: {}, fee: {}, data: {}", pay_id, payment.user, payment.fee, payment.msg);
+        self.payments.insert(&pay_id, &UpgradePayment::from(payment));
 
         let storage_use_after = env::storage_usage();
         refund_deposit(storage_use_after - storage_use_before);
-
+        self.pay_id = pay_id;
         env::log(log_message.as_bytes());
     }
 
@@ -126,7 +127,7 @@ impl PaymentShop {
 
         assert_eq!(account_id, payment.shop, "Access deny");
 
-        let payment_fee_amount = payment.fee * self.payment_fee / (DECIMALS as u128);
+        let payment_fee_amount = payment.fee * self.payment_fee_percent / (DECIMALS as u128);
         let payment_recever = payment.fee - payment_fee_amount;
 
         payment.status = Status::CLAIMED;
@@ -154,6 +155,19 @@ impl PaymentShop {
         self.total_payment_withdraw = payment_withdraw.clone();
 
         let log_message = format!("Withdraw: amount {}", payment_withdraw);
+        env::log(log_message.as_bytes());
+    }
+
+    #[payable]
+    pub fn set_payment_fee(&mut self, payment_fee_percent: U128) {
+        assert_one_yocto();
+        let account_id = env::predecessor_account_id();
+        assert_eq!(account_id, self.owner_id, "Not admin or owner");
+        assert!(payment_fee_percent.0 > 0, "Invalid payment fee");
+
+        self.payment_fee_percent = payment_fee_percent.0;
+
+        let log_message = format!("Set payment fee: {}", payment_fee_percent.0);
         env::log(log_message.as_bytes());
     }
 }

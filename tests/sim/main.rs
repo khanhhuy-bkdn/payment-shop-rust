@@ -284,7 +284,7 @@ pub fn test_claim() {
         1
     );
 
-    let payment_json: PaymentJson = root.view(
+    let mut payment_json: PaymentJson = root.view(
         payment_shop_contract.account_id(), 
         "get_payment_info", 
         &json!({
@@ -308,6 +308,16 @@ pub fn test_claim() {
     assert_eq!(payment_shop_json.pay_id, U128(1));
     assert_eq!(payment_shop_json.payment_fee_percent, U128(20000));
     assert_eq!(payment_shop_json.total_payment, U128(10000000000000000000000000 * 20000 / 100000));
+
+
+    payment_json = root.view(
+        payment_shop_contract.account_id(), 
+        "get_payment_info", 
+        &json!({
+            "pay_id": U128(10)
+        }).to_string().as_bytes()
+    ).unwrap_json();
+    println!("payment_json {:#?}", payment_json)
 
 }
 

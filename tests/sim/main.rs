@@ -42,6 +42,7 @@ pub fn test_req_payment() {
         payment_shop_contract.account_id(), 
         "req_payment", 
         &json!({
+            "order_id":U128(1),
             "user_id": bod.account_id(),
             "msg": "Hello",
             "fee": U128(BOD_FEE_AMOUNT)
@@ -49,6 +50,27 @@ pub fn test_req_payment() {
         DEFAULT_GAS,
         to_yocto("0.01") 
     );
+
+    let mut outcome_req = alice.call(
+        payment_shop_contract.account_id(), 
+        "req_payment", 
+        &json!({
+            "order_id":U128(1),
+            "user_id": bod.account_id(),
+            "msg": "Hello",
+            "fee": U128(BOD_FEE_AMOUNT)
+        }).to_string().as_bytes(), 
+        DEFAULT_GAS,
+        to_yocto("0.01") 
+    );
+
+    // assert error type
+    if let ExecutionStatus::Failure(error) = &outcome_req.promise_errors().remove(0).unwrap().outcome().status {
+        println!("Excute error: {}", error.to_string());
+        assert!(error.to_string().contains("Order ID is set"));
+    } else {
+        unreachable!()
+    }
 
     let payment_json: PaymentJson = root.view(
         payment_shop_contract.account_id(), 
@@ -74,6 +96,7 @@ pub fn test_pay() {
         payment_shop_contract.account_id(), 
         "req_payment", 
         &json!({
+            "order_id":U128(1),
             "user_id": bod.account_id(),
             "msg": "Hello",
             "fee": U128(BOD_FEE_AMOUNT)
@@ -116,6 +139,7 @@ pub fn test_confirm() {
         payment_shop_contract.account_id(), 
         "req_payment", 
         &json!({
+            "order_id":U128(1),
             "user_id": bod.account_id(),
             "msg": "Hello",
             "fee": U128(BOD_FEE_AMOUNT)
@@ -208,6 +232,7 @@ pub fn test_claim() {
         payment_shop_contract.account_id(), 
         "req_payment", 
         &json!({
+            "order_id":U128(1),
             "user_id": bod.account_id(),
             "msg": "Hello",
             "fee": U128(BOD_FEE_AMOUNT)

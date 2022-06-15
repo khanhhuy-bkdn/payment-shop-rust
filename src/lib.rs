@@ -1,6 +1,6 @@
 use near_sdk::json_types::U128;
 use near_sdk::{env, AccountId, Balance, near_bindgen, PanicOnDefault, BorshStorageKey, Promise};
-use near_sdk::collections::LookupMap;
+use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::borsh::{self, BorshSerialize, BorshDeserialize};
 use near_sdk::serde::{Deserialize, Serialize};
 
@@ -29,7 +29,8 @@ pub struct PaymentShop {
     pub payment_fee: u128,
     pub total_payment: u128,
     pub total_payment_withdraw: u128,
-    pub payments: LookupMap<u128, UpgradePayment>
+    pub payments: LookupMap<u128, UpgradePayment>,
+    pub order_ids: UnorderedMap<u128, u128>
 }
 
 #[near_bindgen]
@@ -42,12 +43,15 @@ impl PaymentShop {
             payment_fee: payment_fee.0,
             total_payment: 0,
             total_payment_withdraw: 0,
-            payments: LookupMap::new(StorageKey::PayIdKey)
+            payments: LookupMap::new(StorageKey::PayIdKey),
+            order_ids: UnorderedMap::new(b"m")
         }
     }
 
     #[payable]
-    pub fn req_payment(&mut self, user_id: AccountId, msg: String, fee: U128) {
+    pub fn req_payment(&mut self, order_id: U128, user_id: AccountId, msg: String, fee: U128) {
+        let pay_id = self.order_ids.get(&order_id.0);
+        assert!(pay_id.is_none(), "Order ID is set");
         assert_at_least_one_yocto();
         let shop_id = env::predecessor_account_id();
         self.pay_id += 1;
@@ -61,8 +65,10 @@ impl PaymentShop {
             fee: fee.0,
             status: Status::REQUESTING
         }; 
+
         let log_message = format!("Request payment: payment_id: {}, account: {}, fee: {}, data: {}", self.pay_id, payment.user, payment.fee, payment.msg);
         self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
+        self.order_ids.insert(&order_id.0, &self.pay_id);
 
         let storage_use_after = env::storage_usage();
         refund_deposit(storage_use_after - storage_use_before);

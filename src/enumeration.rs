@@ -26,4 +26,13 @@ impl PaymentShop {
             total_payment: U128(self.total_payment)
         }
     }
+
+    pub fn get_payid_for_orderid(&self, key: U128) -> U128 {
+        match self.order_ids.get(&key.0) {
+            Some(value) => {
+                U128(value)
+            },
+            None => U128(0)
+        }
+    }
 }

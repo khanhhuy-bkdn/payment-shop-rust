@@ -1,28 +1,41 @@
 use crate::*;
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Clone, Debug)]
-#[serde(crate="near_sdk::serde")]
+#[serde(crate = "near_sdk::serde")]
 pub struct Payment {
     pub payment_id: u128,
     pub shop: AccountId,
     pub user: AccountId,
     pub msg: String,
     pub fee: Balance,
-    pub status: Status
+    pub status: Status,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, PartialEq, Serialize, Deserialize, Clone, Debug)]
-#[serde(crate="near_sdk::serde")]
+#[serde(crate = "near_sdk::serde")]
 pub enum Status {
-    REQUESTING, 
-    PAID, 
-    CONFIRMED, 
-    CLAIMED
+    REQUESTING,
+    PAID,
+    CONFIRMED,
+    CLAIMED,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Debug)]
 pub enum UpgradePayment {
-    Current(Payment)
+    Current(Payment),
+}
+
+impl Default for Payment {
+    fn default() -> Self {
+        Payment {
+            payment_id: 0,
+            shop: "".to_string(),
+            user: "".to_string(),
+            msg: "".to_string(),
+            fee: 0,
+            status: Status::REQUESTING,
+        }
+    }
 }
 
 impl From<UpgradePayment> for Payment {
@@ -31,7 +44,7 @@ impl From<UpgradePayment> for Payment {
             UpgradePayment::Current(payment) => payment,
         }
     }
-} 
+}
 
 impl From<Payment> for UpgradePayment {
     fn from(payment: Payment) -> Self {
@@ -39,7 +52,7 @@ impl From<Payment> for UpgradePayment {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Debug)]
 #[serde(crate = "near_sdk::serde")]
 pub struct PaymentJson {
     pub payment_id: U128,
@@ -47,7 +60,7 @@ pub struct PaymentJson {
     pub user: AccountId,
     pub msg: String,
     pub fee: U128,
-    pub status: Status
+    pub status: Status,
 }
 
 impl PaymentJson {
@@ -58,7 +71,7 @@ impl PaymentJson {
             user: payment.user,
             msg: payment.msg,
             fee: U128(payment.fee),
-            status: payment.status
+            status: payment.status,
         }
     }
 }

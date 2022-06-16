@@ -49,7 +49,32 @@ pub fn test_req_payment() {
         to_yocto("0.01") 
     );
 
-    let mut outcome_req = alice.call(
+    let order_id: U128 = root.view(
+        payment_shop_contract.account_id(), 
+        "get_payid_for_orderid", 
+        &json!({
+            "pay_id": U128(1)
+        }).to_string().as_bytes()
+    ).unwrap_json();
+
+    assert_eq!(order_id, U128(1));
+
+    let payment_json: PaymentJson = root.view(
+        payment_shop_contract.account_id(), 
+        "get_payment_info", 
+        &json!({
+            "pay_id": U128(1)
+        }).to_string().as_bytes()
+    ).unwrap_json();
+
+    assert_eq!(payment_json.payment_id, U128(1));
+    assert_eq!(payment_json.shop, alice.account_id());
+    assert_eq!(payment_json.user, bod.account_id());
+    assert_eq!(payment_json.msg, "Hello");
+    assert_eq!(payment_json.fee, U128(10000000000000000000000000));
+    assert_eq!(payment_json.status, Status::REQUESTING);
+
+    let outcome_req = alice.call(
         payment_shop_contract.account_id(), 
         "req_payment", 
         &json!({
@@ -69,21 +94,6 @@ pub fn test_req_payment() {
     } else {
         unreachable!()
     }
-
-    let payment_json: PaymentJson = root.view(
-        payment_shop_contract.account_id(), 
-        "get_payment_info", 
-        &json!({
-            "pay_id": U128(1)
-        }).to_string().as_bytes()
-    ).unwrap_json();
-
-    assert_eq!(payment_json.payment_id, U128(1));
-    assert_eq!(payment_json.shop, alice.account_id());
-    assert_eq!(payment_json.user, bod.account_id());
-    assert_eq!(payment_json.msg, "Hello");
-    assert_eq!(payment_json.fee, U128(10000000000000000000000000));
-    assert_eq!(payment_json.status, Status::REQUESTING);
 }
 
 #[test]

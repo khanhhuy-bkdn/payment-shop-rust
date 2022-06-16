@@ -50,13 +50,12 @@ impl PaymentShop {
 
     #[payable]
     pub fn req_payment(&mut self, order_id: U128, user_id: AccountId, msg: String, fee: U128) {
-        let pay_id = self.order_ids.get(&order_id.0);
-        assert!(pay_id.is_none(), "Order ID is set");
+        let pay_id_for_order = self.order_ids.get(&order_id.0);
+        assert!(pay_id_for_order.is_none(), "Order ID is set");
         assert_at_least_one_yocto();
         let shop_id = env::predecessor_account_id();
         let pay_id = self.pay_id + 1;
      
-
         let storage_use_before = env::storage_usage();
         let payment = Payment {
             payment_id: pay_id,
@@ -67,9 +66,9 @@ impl PaymentShop {
             status: Status::REQUESTING
         }; 
 
-        let log_message = format!("Request payment: payment_id: {}, account: {}, fee: {}, data: {}", self.pay_id, payment.user, payment.fee, payment.msg);
-        self.payments.insert(&self.pay_id, &UpgradePayment::from(payment));
-        self.order_ids.insert(&order_id.0, &self.pay_id);
+        let log_message = format!("Request payment: payment_id: {}, order_id: {}, account: {}, fee: {}, data: {}", &pay_id, &order_id.0, payment.user, payment.fee, payment.msg);
+        self.payments.insert(&pay_id, &UpgradePayment::from(payment));
+        self.order_ids.insert(&order_id.0, &pay_id);
 
         let storage_use_after = env::storage_usage();
         refund_deposit(storage_use_after - storage_use_before);

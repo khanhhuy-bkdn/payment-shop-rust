@@ -4,6 +4,7 @@ use crate::*;
 #[serde(crate = "near_sdk::serde")]
 pub struct Payment {
     pub payment_id: u128,
+    pub order_id: u128,
     pub shop: AccountId,
     pub user: AccountId,
     pub msg: String,
@@ -29,6 +30,7 @@ impl Default for Payment {
     fn default() -> Self {
         Payment {
             payment_id: 0,
+            order_id: 0,
             shop: "".to_string(),
             user: "".to_string(),
             msg: "".to_string(),
@@ -56,6 +58,7 @@ impl From<Payment> for UpgradePayment {
 #[serde(crate = "near_sdk::serde")]
 pub struct PaymentJson {
     pub payment_id: U128,
+    pub order_id: U128,
     pub shop: AccountId,
     pub user: AccountId,
     pub msg: String,
@@ -67,6 +70,7 @@ impl PaymentJson {
     pub fn from(payment_id: u128, payment: Payment) -> Self {
         PaymentJson {
             payment_id: U128(payment_id),
+            order_id: U128(payment.order_id),
             shop: payment.shop,
             user: payment.user,
             msg: payment.msg,

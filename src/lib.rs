@@ -59,6 +59,7 @@ impl PaymentShop {
         let storage_use_before = env::storage_usage();
         let payment = Payment {
             payment_id: pay_id,
+            order_id: order_id.0,
             shop: shop_id,
             user: user_id,
             msg: msg,

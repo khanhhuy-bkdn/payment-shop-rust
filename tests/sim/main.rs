@@ -51,9 +51,9 @@ pub fn test_req_payment() {
 
     let order_id: U128 = root.view(
         payment_shop_contract.account_id(), 
-        "get_payid_for_orderid", 
+        "get_payid_from_orderid", 
         &json!({
-            "pay_id": U128(1)
+            "order_id": U128(1)
         }).to_string().as_bytes()
     ).unwrap_json();
 
@@ -68,6 +68,7 @@ pub fn test_req_payment() {
     ).unwrap_json();
 
     assert_eq!(payment_json.payment_id, U128(1));
+    assert_eq!(payment_json.order_id, U128(1));
     assert_eq!(payment_json.shop, alice.account_id());
     assert_eq!(payment_json.user, bod.account_id());
     assert_eq!(payment_json.msg, "Hello");

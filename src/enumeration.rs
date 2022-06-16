@@ -29,8 +29,8 @@ impl PaymentShop {
         }
     }
 
-    pub fn get_payid_for_orderid(&self, pay_id: U128) -> U128 {
-        match self.order_ids.get(&pay_id.0) {
+    pub fn get_payid_from_orderid(&self, order_id: U128) -> U128 {
+        match self.order_ids.get(&order_id.0) {
             Some(value) => {
                 U128(value)
             },
